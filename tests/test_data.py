@@ -54,6 +54,10 @@ class DataTests(unittest.TestCase):
             text=p.read_text(encoding='utf-8')
             for secret in ['costBasisUSD','protectiveReviewUSD','brokerOrdersAuthorized','C:/Users/','C:\\\\Users\\\\','ghp_','gho_','ALPACA_API_KEY']:
                 self.assertNotIn(secret,text,p.name)
+    def test_no_replacement_characters_in_public_text(self):
+        for p in list((ROOT/'data').glob('*.json'))+[ROOT/'app.js',ROOT/'style.css',ROOT/'index.html']:
+            self.assertNotIn('\ufffd',p.read_text(encoding='utf-8'),p.name)
+
     def test_all_published_numbers_finite(self):
         def walk(x):
             if isinstance(x,float):self.assertTrue(math.isfinite(x))
