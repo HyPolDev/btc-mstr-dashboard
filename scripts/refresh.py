@@ -11,7 +11,7 @@ from pathlib import Path
 from urllib.request import Request,urlopen
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
-import accounting
+import accounting,indicators
 ROOT=Path(__file__).resolve().parents[1];D=ROOT/'data'
 URLS={
  'bulk':'https://bitview.space/api/series/bulk?series=date,lth_supply,supply&index=day1&start=2187',
@@ -165,8 +165,25 @@ def assemble(today,feeds):
     h=read('holders.json');m=read('mstr.json');caps=read('capital-ledger.json');last=m['rows'][-1]
     cap=max((s for s in caps['snapshots'] if s['publishedAt']<=last['btcMarkTimeUTC']),key=lambda s:s['publishedAt'])
     price=dict(schemaVersion='mstr-mnav-refresh/1.0',asOf=last['date'],publishedAt=last['btcMarkTimeUTC'],readAt=datetime.now(timezone.utc).isoformat(),stockPriceUSD=last['sharePrice'],btcPriceUSD=last['btcPrice'])
-    calc=accounting.calculate_refresh(cap,price);sig=signals(m['rows'])
-    snapshot=dict(schemaVersion=1,generatedAt=datetime.now(timezone.utc).isoformat(),clientDate=today,market=last,previousMarket=m['rows'][-2],holder=h['rows'][-1],capital=cap,latestCapital=caps['snapshots'][-1],valuation=calc,signals=sig,feeds=feeds,capitalReviewThrough=caps['reviewedThrough'],capitalCaveats=caps['caveats'],news=read('news.json')['items'][:8],automation=read('operations.json')['automation'])
+    calc=accounting.calculate_refresh(cap,price)
+    try:sig=signals(m['rows'])
+    except (ValueError,TypeError,KeyError,IndexError,ZeroDivisionError) as exc:
+        try:sig=read('signals.json')['rows'][-1]
+        except (FileNotFoundError,KeyError,IndexError,ValueError):sig=None
+        feeds.append(dict(name='MSTR strategy features',state='error',checkedAt=datetime.now(timezone.utc).isoformat(),observationDate=sig.get('date') if sig else None,error=str(exc)[:180]))
+    checked=datetime.now(timezone.utc).isoformat()
+    try:
+        indicator_rows=indicators.calculate(m['rows'])
+        indicator_data=dict(schemaVersion=1,generatedAt=checked,source='MSTR split-adjusted regular-session open and close',atrPct10Definition='10-session mean of abs(100 * (close - open) / open); not conventional true-range ATR',rsi40Definition='Wilder RSI: initial mean of 40 close-to-close gains and losses, then Wilder smoothing; flat series = 50',rows=indicator_rows)
+        save('indicators.json',indicator_data)
+        indicator_state=indicator_rows[-1]
+        market_feed=next((f for f in feeds if f['name']=='MSTR and paired BTC'),{})
+        feeds.append(dict(name='MSTR daily indicators',state='cached' if market_feed.get('state')=='cached' else ('error' if market_feed.get('state')=='error' else 'ok'),checkedAt=checked,observationDate=indicator_state['date'],error='Market feed failed; calculated from retained market data' if market_feed.get('state')=='error' else None))
+    except (ValueError,TypeError,KeyError) as exc:
+        try:indicator_state=read('indicators.json')['rows'][-1]
+        except (FileNotFoundError,KeyError,IndexError,ValueError):indicator_state=None
+        feeds.append(dict(name='MSTR daily indicators',state='error',checkedAt=checked,observationDate=indicator_state['date'] if indicator_state else None,error=str(exc)[:180]))
+    snapshot=dict(schemaVersion=1,generatedAt=datetime.now(timezone.utc).isoformat(),clientDate=today,market=last,previousMarket=m['rows'][-2],holder=h['rows'][-1],capital=cap,latestCapital=caps['snapshots'][-1],valuation=calc,signals=sig,indicators=indicator_state,feeds=feeds,capitalReviewThrough=caps['reviewedThrough'],capitalCaveats=caps['caveats'],news=read('news.json')['items'][:8],automation=read('operations.json')['automation'])
     save('snapshot.json',snapshot);return snapshot
 
 def main():

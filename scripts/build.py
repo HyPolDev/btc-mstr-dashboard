@@ -6,7 +6,7 @@ def build():
     # Copy only explicit public assets. Never copy the workspace or environment.
     for target in ['dist','docs']:
         out=ROOT/target;out.mkdir(exist_ok=True)
-        for name in ['index.html','app.js','style.css']:shutil.copyfile(ROOT/name,out/name)
+        for name in ['index.html','app.js','dilution.mjs','style.css']:shutil.copyfile(ROOT/name,out/name)
         for name in ['assets','data']:shutil.copytree(ROOT/name,out/name,dirs_exist_ok=True)
         (out/'.nojekyll').touch()
     print('Built dist/ preview and docs/ GitHub Pages publication.')

@@ -34,7 +34,7 @@ spending, personal defaults, or changes to the investment policy.
    complete true trading sessions, holder resets and current signal features.
    Do not silently alter strategy thresholds, reset anchors or historical methods.
 7. Run `python -m unittest discover -s tests`, `node --check app.js`, and
-   `python scripts/build.py`. If invalid critical market/calculation state cannot
+   `node --test tests/*.test.mjs`, and `python scripts/build.py`. If invalid critical market/calculation state cannot
    be repaired, do not replace the deployed snapshot; record the failed attempt.
    If only one feed is unavailable, publish retained data with a truthful error.
 8. Review `git diff --stat` and the changed data/source summaries. Scan for

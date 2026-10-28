@@ -15,4 +15,5 @@ jobs:
           node-version: '22'
       - run: python -m unittest discover -s tests
       - run: node --check app.js
+      - run: node --test tests/*.test.mjs
       - run: python scripts/build.py

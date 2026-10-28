@@ -9,7 +9,7 @@ broker connection, CDN dependencies or account required to read it.
 
 ## Views
 
-- Overview: paired prices, valuation, review queue and source health.
+- Overview: paired prices, both mNAV measures, 10-session open-to-close ATR%, 40-session Wilder RSI, personal dilution estimate, historical charts, review queue and source health.
 - MSTR & capital: actual trading dates, historical legacy/current-definition
   mNAV, calculation bridge, instrument register and dated corporate checks.
 - BTC holders: cumulative and90-day turnover, selectable proxy/cohort, lazy
@@ -26,6 +26,8 @@ Python3.10+ and a static HTTP server suffice:
 ```sh
 python scripts/refresh.py
 python -m unittest discover -s tests
+node --test tests/*.test.mjs
+node --check app.js
 python scripts/build.py
 python -m http.server 8080 --directory dist
 ```
@@ -66,9 +68,11 @@ not used. Full news articles are not republished.
 
 ## Personal settings
 
-Entry, protective intention and actual fills are stored only in browser
+Entry date, price, share quantity, protective intention and actual fills are stored only in browser
 localStorage. They are not sent to GitHub, this project, or a brokerage. Export/
 import moves them between devices. Browsers/devices do not automatically sync.
+The dilution estimate compares a fixed holding as a fraction of basic shares outstanding at the purchase date and the latest dated capital snapshot. It assumes no later trades; historical share counts may be carried forward or reconstructed. Pre-2024-08-08 positions are rebased for the 10-for-1 split. Net share-count changes can include buybacks and conversions, not only issuance. The custom ATR% is the average absolute open-to-close percentage move over 10 sessions, not true-range ATR; RSI uses a 40-change Wilder seed and smoothing. Warning colors are visual bands, not automatic orders or validated signals.
+
 Do not commit personal settings or export files. Daily monitoring cannot enforce
 an intraday floor. Gaps and execution delays can produce lower proceeds.
 
