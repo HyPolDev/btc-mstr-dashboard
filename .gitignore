@@ -1,0 +1,10 @@
+dist/
+__pycache__/
+*.pyc
+*.tmp
+.env
+.env.*
+node_modules/
+*.log
+private/
+.preview/
