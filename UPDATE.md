@@ -18,7 +18,7 @@ spending, personal defaults, or changes to the investment policy.
    preferred face/dividend/conversion terms, USD reserve/cash and FX. Append a
    dated capital snapshot ONLY for defensible changes. Keep unknown components
    carried and visibly flagged; never treat silence as evidence of no change.
-   Preserve otherDebt and remove senior claims when adding conversion shares.
+   Preserve otherDebt and remove senior claims when adding conversion shares. Update data/instruments.json alongside the capital ledger for known balance/term changes; reconcile face totals and disclose FX/rounding differences.
    New/unmodeled securities or a changed formula block new valuation claims.
 4. Add relevant primary filing/news cards to data/news.json. Differentiate
    detection, proposed/priced/closed changes and reviewed facts. Do not label a
