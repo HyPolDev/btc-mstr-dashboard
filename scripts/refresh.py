@@ -65,6 +65,10 @@ def market(today):
     end=int(datetime.fromisoformat(today).replace(tzinfo=timezone.utc).timestamp())
     u='https://query1.finance.yahoo.com/v8/finance/chart/MSTR?'+urlencode(dict(period1=1597017600,period2=end,interval='1d',events='splits',includeAdjustedClose='true'))
     data=fetch(u)['chart']['result'][0];q=data['indicators']['quote'][0];rows=[]
+    for split in data.get('events',{}).get('splits',{}).values():
+        split_date=datetime.fromtimestamp(split['date'],ZoneInfo('America/New_York')).date().isoformat()
+        if split_date!='2024-08-08' or str(split.get('splitRatio')) not in ['10:1','10/1']:
+            raise ValueError('New or changed equity split requires a reviewed historical price/share rebasing')
     old=read('mstr.json');by={r['date']:r for r in old['rows']};ledger=read('capital-ledger.json')['snapshots']
     # Get BTC at the matching regular-session close, using the last completed
     # one-minute Coinbase candle. Only new observations need network marks.
@@ -151,7 +155,7 @@ def assemble(today,feeds):
     cap=max((s for s in caps['snapshots'] if s['publishedAt']<=last['btcMarkTimeUTC']),key=lambda s:s['publishedAt'])
     price=dict(schemaVersion='mstr-mnav-refresh/1.0',asOf=last['date'],publishedAt=last['btcMarkTimeUTC'],readAt=datetime.now(timezone.utc).isoformat(),stockPriceUSD=last['sharePrice'],btcPriceUSD=last['btcPrice'])
     calc=accounting.calculate_refresh(cap,price);sig=signals(m['rows'])
-    snapshot=dict(schemaVersion=1,generatedAt=datetime.now(timezone.utc).isoformat(),clientDate=today,market=last,previousMarket=m['rows'][-2],holder=h['rows'][-1],capital=cap,latestCapital=caps['snapshots'][-1],valuation=calc,signals=sig,feeds=feeds,capitalReviewThrough=caps['reviewedThrough'],capitalCaveats=caps['caveats'],news=read('news.json')['items'][:8],automation={'state':'Pending schedule setup','cadence':'Daily','timezone':'Europe/Madrid'})
+    snapshot=dict(schemaVersion=1,generatedAt=datetime.now(timezone.utc).isoformat(),clientDate=today,market=last,previousMarket=m['rows'][-2],holder=h['rows'][-1],capital=cap,latestCapital=caps['snapshots'][-1],valuation=calc,signals=sig,feeds=feeds,capitalReviewThrough=caps['reviewedThrough'],capitalCaveats=caps['caveats'],news=read('news.json')['items'][:8],automation=read('operations.json')['automation'])
     save('snapshot.json',snapshot);return snapshot
 
 def main():
@@ -162,7 +166,7 @@ def main():
             data=read(filename);endpoint=endpoint or (data.get('rows',[{}])[-1].get('date') if 'rows' in data else data.get('checkedAt'))
             feeds.append(dict(name=name,state='cached' if a.offline else 'ok',checkedAt=datetime.now(timezone.utc).isoformat(),observationDate=endpoint,error=None))
         except Exception as e:
-            feeds.append(dict(name=name,state='error',checkedAt=datetime.now(timezone.utc).isoformat(),observationDate=read(filename).get('rows',[{}])[-1].get('date'),error=str(e)[:180]))
+            feeds.append(dict(name=name,state='error',checkedAt=datetime.now(timezone.utc).isoformat(),observationDate=(read(filename)['rows'][-1].get('date') if 'rows' in read(filename) else next((x.get('publishedAt') or x.get('eventDate') for x in read(filename).get('items',[]) if x.get('publishedAt')),None)),error=str(e)[:180]))
     s=assemble(today,feeds);print(json.dumps(dict(generatedAt=s['generatedAt'],marketAsOf=s['market']['date'],holderAsOf=s['holder']['date'],feeds=feeds)))
     return s
 
