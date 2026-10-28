@@ -1,5 +1,5 @@
 import copy,json,math,sys,unittest
-from datetime import date,timedelta
+from datetime import date,timedelta,datetime,timezone
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT/'scripts'))
 import accounting,refresh
@@ -25,7 +25,7 @@ class DataTests(unittest.TestCase):
         s=read('snapshot.json');rows=read('mstr.json')['rows'];refresh.validate_dates(rows)
         self.assertNotIn('2026-01-19',[r['date'] for r in rows])
         for r in rows:
-            self.assertLess(r['date'],s['clientDate']);self.assertLess(date.fromisoformat(r['date']).weekday(),5)
+            self.assertLessEqual(r['date'],s['clientDate']);self.assertLess(date.fromisoformat(r['date']).weekday(),5)
             self.assertLessEqual(r['low'],min(r['open'],r['sharePrice']));self.assertGreaterEqual(r['high'],max(r['open'],r['sharePrice']))
     def test_holder_days_contiguous_and_volumes_valid(self):
         rows=read('holders.json')['rows'];refresh.validate_dates(rows,True)
@@ -49,6 +49,13 @@ class DataTests(unittest.TestCase):
     def test_missing_or_duplicate_dates_fail(self):
         with self.assertRaises(ValueError):refresh.validate_dates([{'date':'2026-01-01'},{'date':'2026-01-03'}],True)
         with self.assertRaises(ValueError):refresh.validate_dates([{'date':'2026-01-01'},{'date':'2026-01-01'}])
+    def test_same_day_completed_equity_close_is_not_dropped(self):
+        self.assertFalse(refresh.completed_equity_day('2026-10-28','2026-10-28',datetime(2026,10,28,19,0,tzinfo=timezone.utc)))
+        self.assertTrue(refresh.completed_equity_day('2026-10-28','2026-10-28',datetime(2026,10,28,21,0,tzinfo=timezone.utc)))
+        self.assertFalse(refresh.completed_equity_day('2026-10-29','2026-10-28',datetime(2026,10,29,21,0,tzinfo=timezone.utc)))
+    def test_exchange_metadata_handles_current_half_day(self):
+        start=int(datetime(2026,11,27,14,30,tzinfo=timezone.utc).timestamp());end=int(datetime(2026,11,27,18,0,tzinfo=timezone.utc).timestamp())
+        self.assertTrue(refresh.completed_equity_day('2026-11-27','2026-11-27',datetime(2026,11,27,18,10,tzinfo=timezone.utc),{'start':start,'end':end}))
     def test_public_files_exclude_private_context(self):
         for p in (ROOT/'data').glob('*.json'):
             text=p.read_text(encoding='utf-8')

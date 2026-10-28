@@ -40,6 +40,17 @@ def validate_dates(rows,continuous=False):
     if not dates or dates!=sorted(set(dates)):raise ValueError('Empty, duplicate or unordered dates')
     if continuous and any((date.fromisoformat(b)-date.fromisoformat(a)).days!=1 for a,b in zip(dates,dates[1:])):raise ValueError('Interior daily gap')
 
+def equity_close(day,venue=None):
+    day=date.fromisoformat(day) if isinstance(day,str) else day
+    if venue and datetime.fromtimestamp(venue['start'],ZoneInfo('America/New_York')).date()==day:
+        return datetime.fromtimestamp(venue['end'],timezone.utc)
+    nov=date(day.year,11,1);thanks=nov+timedelta(days=(3-nov.weekday())%7+21)
+    early=day==thanks+timedelta(days=1) or (day.month==12 and day.day==24 and day.weekday()<5) or (day.month==7 and day.day==3 and day.weekday()<5)
+    return datetime(day.year,day.month,day.day,13 if early else 16,tzinfo=ZoneInfo('America/New_York')).astimezone(timezone.utc)
+
+def completed_equity_day(day,today,now,venue=None):
+    return day<=today and equity_close(day,venue)<=now
+
 def holders(today):
     keys=['bulk','cumulative','coinmetrics','obm']
     with ThreadPoolExecutor(max_workers=4) as pool:values=list(pool.map(lambda k:fetch(URLS[k],k!='obm'),keys))
@@ -62,27 +73,27 @@ def holders(today):
 def market(today):
     # A genuine venue quote series supplies the equity trading calendar, not a
     # provider's carried holiday prices. Use unadjusted-for-dividend split OHLC.
-    end=int(datetime.fromisoformat(today).replace(tzinfo=timezone.utc).timestamp())
+    # Include today's bar ONLY after the exchange's actual session close. UTC
+    # Bitcoin days keep their separate completed-day boundary.
+    end=int((datetime.fromisoformat(today).replace(tzinfo=timezone.utc)+timedelta(days=1)).timestamp())
     u='https://query1.finance.yahoo.com/v8/finance/chart/MSTR?'+urlencode(dict(period1=1597017600,period2=end,interval='1d',events='splits',includeAdjustedClose='true'))
     data=fetch(u)['chart']['result'][0];q=data['indicators']['quote'][0];rows=[]
     for split in data.get('events',{}).get('splits',{}).values():
         split_date=datetime.fromtimestamp(split['date'],ZoneInfo('America/New_York')).date().isoformat()
         if split_date!='2024-08-08' or str(split.get('splitRatio')) not in ['10:1','10/1']:
             raise ValueError('New or changed equity split requires a reviewed historical price/share rebasing')
-    old=read('mstr.json');by={r['date']:r for r in old['rows']};ledger=read('capital-ledger.json')['snapshots']
+    old=read('mstr.json');by={r['date']:r for r in old['rows']};ledger=read('capital-ledger.json')['snapshots'];now=datetime.now(timezone.utc);venue=data.get('meta',{}).get('currentTradingPeriod',{}).get('regular')
     # Get BTC at the matching regular-session close, using the last completed
     # one-minute Coinbase candle. Only new observations need network marks.
     for i,t in enumerate(data['timestamp']):
         d=datetime.fromtimestamp(t,ZoneInfo('America/New_York')).date().isoformat()
-        if d>=today or q['close'][i] is None:continue
+        if not completed_equity_day(d,today,now,venue) or q['close'][i] is None:continue
         r=dict(by.get(d,{}));r.update(date=d,sharePrice=q['close'][i],open=q['open'][i],high=q['high'][i],low=q['low'][i],stockVolume=q['volume'][i])
         if not all(isinstance(r[k],(int,float)) and r[k]>0 for k in ['sharePrice','open','high','low']):raise ValueError('Invalid equity OHLC')
         if not r.get('btcMarkTimeUTC') or not r.get('btcPrice'):
             # Yahoo timestamps identify each exchange opening session. Standard
             # closes16:00 ET; explicit US half-days follow Thanksgiving/Christmas.
-            day=date.fromisoformat(d);nov=date(day.year,11,1);thanks=nov+timedelta(days=(3-nov.weekday())%7+21)
-            early=day==thanks+timedelta(days=1) or (day.month==12 and day.day==24 and day.weekday()<5) or (day.month==7 and day.day==3 and day.weekday()<5)
-            close=datetime(day.year,day.month,day.day,13 if early else 16,tzinfo=ZoneInfo('America/New_York')).astimezone(timezone.utc)
+            close=equity_close(d,venue)
             a=close-timedelta(minutes=1);cu='https://api.exchange.coinbase.com/products/BTC-USD/candles?'+urlencode({'start':a.isoformat(),'end':close.isoformat(),'granularity':60})
             candles=fetch(cu);c=next((x for x in candles if x[0]==int(a.timestamp())),None)
             if c is None:raise ValueError('Missing matched BTC minute '+d)
