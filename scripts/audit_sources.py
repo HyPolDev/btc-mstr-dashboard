@@ -31,5 +31,20 @@ def main():
     result = dict(checkedAt=datetime.now(timezone.utc).isoformat(), sources=rows)
     (out/'audit.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
     print(json.dumps(result,indent=2))
+    # Normal Chromium rendering only: no stealth, proxy rotation or challenges.
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            for name in ['issuer','debt','press','filings']:
+                try:
+                    response = page.goto(SOURCES[name],wait_until='domcontentloaded',timeout=45000)
+                    raw = page.locator('#__NEXT_DATA__').text_content(timeout=15000)
+                    (out/(name+'-page.json')).write_text(raw,encoding='utf-8')
+                    print(name,'Chromium',response.status,'structured data bytes',len(raw))
+                except Exception as exc: print(name,'Chromium failed',str(exc)[:200])
+            browser.close()
+    except ImportError: pass
 
 if __name__ == '__main__': main()
