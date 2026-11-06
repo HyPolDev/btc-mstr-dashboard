@@ -12,7 +12,7 @@ class DataTests(unittest.TestCase):
         self.assertAlmostEqual(ev/gross,v['metrics']['legacyEvToGrossBtc'],places=10)
         self.assertAlmostEqual(p['sharePrice']*v['conversions']['fdso']/(v['conversions']['netBtc']*p['btcPrice']),v['metrics']['strategyMnav'],places=10)
     def test_conversion_removes_claim_and_adds_shares_once(self):
-        c=read('capital-ledger.json')['snapshots'][-1];s=read('snapshot.json');p=dict(schemaVersion='mstr-mnav-refresh/1.0',asOf='2026-10-27',publishedAt='2026-10-27T20:00:00Z',readAt='2026-10-28T23:00:00Z',stockPriceUSD=1001,btcPriceUSD=100000)
+        s=read('snapshot.json');c=s['capital'];p=dict(schemaVersion='mstr-mnav-refresh/1.0',asOf=s['market']['date'],publishedAt=s['market']['btcMarkTimeUTC'],readAt=s['generatedAt'],stockPriceUSD=1001,btcPriceUSD=100000)
         v=accounting.calculate_refresh(c,p)['conversions'];debt=sum(t['principal'] for t in c['debtTranches']);added=sum(t['conversionShares'] for t in c['debtTranches'])+c['strk']['conversionShares']
         self.assertAlmostEqual(v['removedDebtClaimUSD'],debt);self.assertAlmostEqual(v['removedStrkClaimUSD'],c['strk']['notionalUSD'])
         self.assertAlmostEqual(v['fdso'],c['basicShares']+c['options']+c['rsuPsu']+added)

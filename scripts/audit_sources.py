@@ -24,27 +24,21 @@ def main():
             with urlopen(req, timeout=30) as response:
                 data = response.read()
                 row = dict(name=name, url=url, status=response.status, bytes=len(data), contentType=response.headers.get('Content-Type'))
-            (out/(name+'.txt')).write_bytes(data)
+            # The audit stores status/size only, not full articles or credentials.
         except Exception as exc:
             row = dict(name=name, url=url, error=str(exc))
         rows.append(row)
+    import os
+    token=os.environ.get('ISSUER_DELIVERY_TOKEN')
+    if token:
+        try:
+            req=Request('https://cdn.contentstack.io/v3/content_types/btc_tracker/entries?environment=production&limit=1',headers={'api_key':'bltf8d808d9b8cebd37','access_token':token})
+            with urlopen(req,timeout=30) as response:
+                payload=json.load(response)
+                rows.append(dict(name='issuer public structured delivery',url='https://www.strategy.com/',status=response.status,entryCount=len(payload['entries'])))
+        except Exception as exc:rows.append(dict(name='issuer public structured delivery',error=type(exc).__name__+': source unavailable'))
     result = dict(checkedAt=datetime.now(timezone.utc).isoformat(), sources=rows)
     (out/'audit.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
     print(json.dumps(result,indent=2))
-    # Normal Chromium rendering only: no stealth, proxy rotation or challenges.
-    try:
-        from playwright.sync_api import sync_playwright
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
-            for name in ['issuer','debt','press','filings']:
-                try:
-                    response = page.goto(SOURCES[name],wait_until='domcontentloaded',timeout=45000)
-                    raw = page.locator('#__NEXT_DATA__').text_content(timeout=15000)
-                    (out/(name+'-page.json')).write_text(raw,encoding='utf-8')
-                    print(name,'Chromium',response.status,'structured data bytes',len(raw))
-                except Exception as exc: print(name,'Chromium failed',str(exc)[:200])
-            browser.close()
-    except ImportError: pass
 
 if __name__ == '__main__': main()

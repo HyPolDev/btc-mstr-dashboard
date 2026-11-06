@@ -1,0 +1,149 @@
+{
+  "tracker": {
+    "as_of_date": "2026-11-02",
+    "basic_shares_outstanding": 423533159,
+    "btc_holdings": 849327,
+    "cash": 4789000000,
+    "operating_cash": 133000000,
+    "debt": 6714000000,
+    "pref": 13135891600,
+    "ibit_shares": 453112131,
+    "shares": {
+      "convert_2028": 5513489,
+      "convert_2029": 2230800,
+      "convert_2030_a": 5341600,
+      "convert_2030_b": 4614400,
+      "convert_2031": 2594314,
+      "convert_2032": 3915200,
+      "convert_strk": 1402000,
+      "options_outstanding": 3106115,
+      "rsu_psu_unvested": 861568
+    },
+    "strc_metrics": {
+      "dividend": 12,
+      "next_payout_date": "2026-11-04",
+      "next_record_date": "2026-11-03",
+      "show_transition_dividend": false,
+      "transition_dividend_rate": 11.5,
+      "shares": 81822162,
+      "notional_intl": 0,
+      "current_fx_rate": 0,
+      "cumulative_notional": 12304980000
+    },
+    "strd_metrics": {
+      "dividend": 10,
+      "next_payout_date": "2026-12-31",
+      "next_record_date": "2026-12-15",
+      "show_transition_dividend": false,
+      "transition_dividend_rate": null,
+      "shares": 14024221,
+      "notional_intl": 0,
+      "current_fx_rate": 0,
+      "cumulative_notional": 14957170000
+    },
+    "stre_metrics": {
+      "dividend": 10,
+      "next_payout_date": "2026-12-31",
+      "next_record_date": "2026-12-15",
+      "show_transition_dividend": false,
+      "transition_dividend_rate": null,
+      "shares": 8652100,
+      "notional_intl": 7750000,
+      "current_fx_rate": 1.1164,
+      "cumulative_notional": 13022000000
+    },
+    "strf_metrics": {
+      "dividend": 10,
+      "next_payout_date": "2026-12-31",
+      "next_record_date": "2026-12-15",
+      "show_transition_dividend": false,
+      "transition_dividend_rate": null,
+      "shares": 12839689,
+      "notional_intl": 0,
+      "current_fx_rate": 0,
+      "cumulative_notional": 9477640000
+    },
+    "strk_metrics": {
+      "dividend": 8,
+      "next_payout_date": "2026-12-31",
+      "next_record_date": "2026-12-15",
+      "show_transition_dividend": false,
+      "transition_dividend_rate": null,
+      "shares": 14020744,
+      "notional_intl": 0,
+      "current_fx_rate": 0,
+      "cumulative_notional": 13701920000
+    },
+    "publish_details": {
+      "time": "2026-11-03T12:05:11.581Z"
+    }
+  },
+  "converts": [
+    {
+      "title": "Convert 2032",
+      "notional": 800000000,
+      "strike_price": 204.33,
+      "coupon": 2.25,
+      "maturity_date": "2032-06-15",
+      "put_date": "2029-06-15",
+      "publish_details": {
+        "time": "2026-11-02T21:29:42.246Z"
+      }
+    },
+    {
+      "title": "Convert 2031",
+      "notional": 603750000,
+      "strike_price": 232.72,
+      "coupon": 0.875,
+      "maturity_date": "2031-03-15",
+      "put_date": "2028-09-15",
+      "publish_details": {
+        "time": "2026-11-02T21:29:42.310Z"
+      }
+    },
+    {
+      "title": "Convert 2030 B",
+      "notional": 2000000000,
+      "strike_price": 433.43,
+      "coupon": 0,
+      "maturity_date": "2030-03-01",
+      "put_date": "2028-03-01",
+      "publish_details": {
+        "time": "2026-11-02T21:29:42.378Z"
+      }
+    },
+    {
+      "title": "Convert 2030 A",
+      "notional": 800000000,
+      "strike_price": 149.77,
+      "coupon": 0.625,
+      "maturity_date": "2030-03-15",
+      "put_date": "2028-09-15",
+      "publish_details": {
+        "time": "2026-11-02T21:29:42.443Z"
+      }
+    },
+    {
+      "title": "Convert 2028",
+      "notional": 1010000000,
+      "strike_price": 183.19,
+      "coupon": 0.625,
+      "maturity_date": "2028-09-15",
+      "put_date": "2027-09-15",
+      "publish_details": {
+        "time": "2026-11-02T21:29:42.505Z"
+      }
+    },
+    {
+      "title": "Convert 2029",
+      "notional": 1500000000,
+      "strike_price": 672.4,
+      "coupon": 0,
+      "maturity_date": "2029-12-01",
+      "put_date": "2028-06-01",
+      "publish_details": {
+        "time": "2026-11-02T21:29:42.566Z"
+      }
+    }
+  ]
+}

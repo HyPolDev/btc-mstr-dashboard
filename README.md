@@ -28,23 +28,22 @@ python scripts/refresh.py
 python -m unittest discover -s tests
 node --test tests/*.test.mjs
 node --check app.js
+python scripts/validate.py
 python scripts/build.py
 python -m http.server 8080 --directory dist
 ```
 
 Use `python scripts/refresh.py --offline` to rebuild derived state from saved
 observations without fetching. It labels feeds cached, not freshly checked.
-No package install or credentials are needed. Missing feeds retain the last
+Python uses the standard library. Automated issuer ingestion uses the public read-only ISSUER_DELIVERY_TOKEN repository secret; offline builds and non-issuer feeds need no key. Missing feeds retain the last
 valid component and show an error. No numeric value is filled with zero simply
 because a provider is unavailable. The source data dates differ intentionally.
 
 ## Daily operation
 
-The requested Codex daily updater follows [UPDATE.md](UPDATE.md), including
-primary-source capital/news review before publishing. No GitHub scheduled data
-workflow duplicates it. GitHub Pages publishes `main:/docs`; `scripts/build.py`
-produces that directory from explicit public assets and data only. GitHub CI
-checks changes. Execution history lives in Git; updater failures remain visible.
+The Python/GitHub Actions pipeline runs daily at 22:37 UTC and deploys the validated artifact directly to Pages in the same workflow. Run it manually from Actions; refresh=false republishes saved data. There is no AI dependency or personal computer requirement. See [UPDATE.md](UPDATE.md) for failures and rollback, and [SOURCE_AUDIT.md](SOURCE_AUDIT.md) for actual capital coverage.
+
+Known issuer capital fields and indexes refresh through public structured delivery entries. Other secured debt and complex contractual terms retain dated human review; unfamiliar events appear as exceptions. The public read-only issuer delivery token is kept in an Actions secret. Source errors retain last valid components and original dates. Execution/deployment history lives in GitHub Actions and Git.
 
 ## Accounting and evidence
 

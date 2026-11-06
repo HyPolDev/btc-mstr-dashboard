@@ -1,0 +1,17 @@
+{
+  "legalReviewedThrough": "2026-10-28",
+  "otherDebt": {
+    "valueUSD": 40044000,
+    "asOf": "2026-06-30",
+    "publishedAt": "2026-08-03T23:59:59Z",
+    "sourceURL": "https://www.sec.gov/Archives/edgar/data/1050446/000105044626000044/mstr-20260630.htm",
+    "status": "Manual quarterly balance; not included in issuer dashboard debt"
+  },
+  "strkConversion": {
+    "priceUSD": 1000,
+    "asOf": "2026-06-30",
+    "publishedAt": "2026-08-03T23:59:59Z",
+    "sourceURL": "https://www.sec.gov/Archives/edgar/data/1050446/000105044626000044/mstr-20260630.htm",
+    "status": "Reviewed conversion rule. New certificates, anti-dilution adjustments and cash settlement options require review"
+  }
+}

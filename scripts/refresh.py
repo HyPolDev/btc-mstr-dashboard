@@ -1,8 +1,9 @@
 """Free public-data refresh. Python stdlib only; no broker keys or trading.
 
 Each feed is validated before atomic replacement. Failed feeds retain last good
-data and produce a visible health error. Capital changes require a dated issuer
-review; a successful HTTP request never asserts corporate solvency.
+data and produce a visible health error. Dated issuer fields are reconciled by
+issuer.py; unfamiliar contracts require human review. HTTP success never asserts
+corporate solvency.
 """
 import argparse,csv,copy,hashlib,io,json,math,os,re,statistics,time
 from concurrent.futures import ThreadPoolExecutor
@@ -11,10 +12,13 @@ from pathlib import Path
 from urllib.request import Request,urlopen
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
-import accounting,indicators
+import accounting,indicators,issuer
+from public_sources import fetch
 ROOT=Path(__file__).resolve().parents[1];D=ROOT/'data'
 URLS={
  'bulk':'https://bitview.space/api/series/bulk?series=date,lth_supply,supply&index=day1&start=2187',
+ 'dates':'https://bitview.space/api/series/date/day1?start=2187',
+ 'lth':'https://bitview.space/api/series/lth_supply/day1?start=2187',
  'cumulative':'https://bitview.space/api/series/lth_transfer_volume_cumulative/day1?start=2187',
  'coinmetrics':'https://community-api.coinmetrics.io/v4/timeseries/asset-metrics?assets=btc&metrics=PriceUSD,SplyCur&frequency=1d&start_time=2014-12-29&page_size=10000',
  'obm':'https://raw.githubusercontent.com/diegorllanos/open-bitcoin-metrics/main/metrics/obm_spent_value_ge155d_btc_daily/obm_spent_value_ge155d_btc_daily.csv',
@@ -24,17 +28,6 @@ URLS={
 def read(n):return json.loads((D/n).read_text(encoding='utf-8'))
 def save(n,x):
     p=D/n;tmp=p.with_suffix('.tmp');tmp.write_text(json.dumps(x,ensure_ascii=False,allow_nan=False,separators=(',',':')),encoding='utf-8');os.replace(tmp,p)
-def fetch(url,json_data=True):
-    # SEC identifies a research user agent, never an API credential.
-    req=Request(url,headers={'User-Agent':'BTC-MSTR-Research/1.0 public-dashboard https://github.com/HyPolDev/btc-mstr-dashboard','Accept':'application/json,text/html,text/csv,*/*'})
-    for attempt in range(3):
-        try:
-            with urlopen(req,timeout=35) as res:raw=res.read()
-            return json.loads(raw) if json_data else raw.decode('utf-8-sig')
-        except Exception:
-            if attempt==2:raise
-            time.sleep(1+attempt)
-
 def validate_dates(rows,continuous=False):
     dates=[x['date'] for x in rows]
     if not dates or dates!=sorted(set(dates)):raise ValueError('Empty, duplicate or unordered dates')
@@ -52,12 +45,19 @@ def completed_equity_day(day,today,now,venue=None):
     return day<=today and equity_close(day,venue)<=now
 
 def holders(today):
-    keys=['bulk','cumulative','coinmetrics','obm']
+    keys=['dates','lth','cumulative','coinmetrics']
     with ThreadPoolExecutor(max_workers=4) as pool:values=list(pool.map(lambda k:fetch(URLS[k],k!='obm'),keys))
-    bulk,cum,cm,ob=values
+    dates,lth_data,cum,cm=values;bulk=[dates,lth_data]
+    old=read('holders.json');prior={r['date']:r for r in old['rows']}
+    try:
+        ob=fetch(URLS['obm'],False);spent={x['date']:float(x['value']) for x in csv.DictReader(io.StringIO(ob))}
+        crosscheck=dict(name='155-day holder cross-check',state='ok',checkedAt=datetime.now(timezone.utc).isoformat(),observationDate=max(spent),error=None)
+    except Exception as exc:
+        spent={r['date']:r['grossSpent155'] for r in old['rows'] if r.get('grossSpent155') is not None}
+        crosscheck=dict(name='155-day holder cross-check',state='error',checkedAt=datetime.now(timezone.utc).isoformat(),observationDate=max(spent,default=None),error=str(exc)[:180])
     if cm.get('next_page_url'):raise ValueError('Coin Metrics pagination must be resolved, not truncated')
-    if len(bulk)!=3 or any(x['index']!='day1' for x in bulk) or len({(x['start'],x['end'],len(x['data'])) for x in bulk})!=1:raise ValueError('Bitview schema/alignment changed')
-    prices={r['time'][:10]:r for r in cm['data']};spent={x['date']:float(x['value']) for x in csv.DictReader(io.StringIO(ob))}
+    if any(x['index']!='day1' for x in bulk) or len({(x['start'],x['end'],len(x['data'])) for x in bulk})!=1:raise ValueError('Bitview schema/alignment changed')
+    prices={r['time'][:10]:r for r in cm['data']}
     cumulative={cum['start']+i:x for i,x in enumerate(cum['data'])}
     endpoint=min(max(d for d in bulk[0]['data'] if d<today),max(d for d in prices if d<today and prices[d].get('PriceUSD') and prices[d].get('SplyCur')))
     rows=[]
@@ -65,9 +65,9 @@ def holders(today):
         if not '2015-01-01'<=d<=endpoint:continue
         p=prices[d];ix=bulk[0]['start']+i;gross=cumulative[ix]-cumulative[ix-1];lth=bulk[1]['data'][i];supply=float(p['SplyCur'])
         if not 0<=gross or not 0<=lth<=supply or not float(p['PriceUSD'])>0:raise ValueError('Invalid holder value')
-        rows.append(dict(date=d,price=float(p['PriceUSD']),circulatingSupply=supply,lthSupply150=lth,netDecline150=max(0,bulk[1]['data'][i-1]-lth),grossSpent150=gross,grossSpent155=spent.get(d),utxoSupply150=bulk[2]['data'][i]))
+        rows.append(dict(date=d,price=float(p['PriceUSD']),circulatingSupply=supply,lthSupply150=lth,netDecline150=max(0,bulk[1]['data'][i-1]-lth),grossSpent150=gross,grossSpent155=spent.get(d),utxoSupply150=prior.get(d,{}).get('utxoSupply150')))
     validate_dates(rows,True)
-    old=read('holders.json');old.update(rows=rows,fetchedAt=datetime.now(timezone.utc).isoformat(),sourceURLs=list(URLS[k] for k in keys))
+    old.update(rows=rows,fetchedAt=datetime.now(timezone.utc).isoformat(),sourceURLs=[URLS[k] for k in keys]+[URLS['obm']],sourceHealth=[crosscheck],unusedLegacyField='utxoSupply150: retired Bitview supply endpoint; preserved only where previously observed, otherwise null. Not used in turnover calculations.')
     save('holders.json',old);return rows[-1]['date']
 
 def market(today):
@@ -183,11 +183,19 @@ def assemble(today,feeds):
         try:indicator_state=read('indicators.json')['rows'][-1]
         except (FileNotFoundError,KeyError,IndexError,ValueError):indicator_state=None
         feeds.append(dict(name='MSTR daily indicators',state='error',checkedAt=checked,observationDate=indicator_state['date'] if indicator_state else None,error=str(exc)[:180]))
-    snapshot=dict(schemaVersion=1,generatedAt=datetime.now(timezone.utc).isoformat(),clientDate=today,market=last,previousMarket=m['rows'][-2],holder=h['rows'][-1],capital=cap,latestCapital=caps['snapshots'][-1],valuation=calc,signals=sig,indicators=indicator_state,feeds=feeds,capitalReviewThrough=caps['reviewedThrough'],capitalCaveats=caps['caveats'],news=read('news.json')['items'][:8],automation=read('operations.json')['automation'])
+    capital_status=read('capital-status.json') if (D/'capital-status.json').exists() else None
+    if capital_status:
+        calc['qualityFlags'].append('manual_other_debt_and_legal_terms_carried')
+        if capital_status['state']=='error':calc['qualityFlags'].append('capital_ingestion_failed_retained')
+        if any(x['rule']=='unreviewed_financing_or_periodic_filing' for x in capital_status['exceptions']):calc['qualityFlags'].append('unreviewed_corporate_disclosures')
+    snapshot=dict(schemaVersion=1,generatedAt=datetime.now(timezone.utc).isoformat(),clientDate=today,market=last,previousMarket=m['rows'][-2],holder=h['rows'][-1],capital=cap,latestCapital=caps['snapshots'][-1],valuation=calc,signals=sig,indicators=indicator_state,feeds=feeds,capitalStatus=capital_status,capitalReviewThrough=caps['reviewedThrough'],capitalCaveats=caps['caveats'],news=read('news.json')['items'][:8],automation=read('operations.json')['automation'])
     save('snapshot.json',snapshot);return snapshot
 
 def main():
     ap=argparse.ArgumentParser();ap.add_argument('--as-of',default=datetime.now(ZoneInfo('Europe/Madrid')).date().isoformat());ap.add_argument('--offline',action='store_true');a=ap.parse_args();today=a.as_of;feeds=[]
+    if not a.offline:
+        try:feeds.extend(issuer.run(today,read,save,ROOT))
+        except Exception as exc:feeds.append(dict(name='Issuer ingestion',state='error',checkedAt=datetime.now(timezone.utc).isoformat(),observationDate=None,error=type(exc).__name__+': issuer ingestion unavailable; inspect workflow logs and configuration'))
     for name,fn,filename in [('Holders',holders,'holders.json'),('MSTR and paired BTC',market,'mstr.json'),('BTC venue daily highs',btc_daily,'btc-candles.json'),('SEC filings',news,'news.json')]:
         try:
             endpoint=fn(today) if not a.offline else None
@@ -195,6 +203,7 @@ def main():
             feeds.append(dict(name=name,state='cached' if a.offline else 'ok',checkedAt=datetime.now(timezone.utc).isoformat(),observationDate=endpoint,error=None))
         except Exception as e:
             feeds.append(dict(name=name,state='error',checkedAt=datetime.now(timezone.utc).isoformat(),observationDate=(read(filename)['rows'][-1].get('date') if 'rows' in read(filename) else next((x.get('publishedAt') or x.get('eventDate') for x in read(filename).get('items',[]) if x.get('publishedAt')),None)),error=str(e)[:180]))
+    feeds.extend(read('holders.json').get('sourceHealth',[]))
     s=assemble(today,feeds);print(json.dumps(dict(generatedAt=s['generatedAt'],marketAsOf=s['market']['date'],holderAsOf=s['holder']['date'],feeds=feeds)))
     return s
 
