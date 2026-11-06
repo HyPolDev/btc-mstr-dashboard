@@ -3,6 +3,7 @@ import hashlib
 import json
 import math
 import os
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 import accounting
@@ -46,7 +47,7 @@ def check():
 def main():
     s=check()
     data=dict(schemaVersion=1,validatedAt=datetime.now(timezone.utc).isoformat(),snapshotGeneratedAt=s['generatedAt'],
-        sourceCommit=os.environ.get('GITHUB_SHA'),runUrl=('https://github.com/'+os.environ['GITHUB_REPOSITORY']+'/actions/runs/'+os.environ['GITHUB_RUN_ID']) if os.environ.get('GITHUB_RUN_ID') else None,
+        sourceCommit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),runUrl=('https://github.com/'+os.environ['GITHUB_REPOSITORY']+'/actions/runs/'+os.environ['GITHUB_RUN_ID']) if os.environ.get('GITHUB_RUN_ID') else None,
         feedErrors=[f['name'] for f in s['feeds'] if f['state']=='error'],capitalCoverage=s['capitalStatus']['state'])
     (ROOT/'data/deployment.json').write_text(json.dumps(data,separators=(',',':')),encoding='utf-8')
     print(json.dumps(data))
