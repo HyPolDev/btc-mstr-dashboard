@@ -44,7 +44,13 @@ def equity_close(day,venue=None):
 def completed_equity_day(day,today,now,venue=None):
     return day<=today and equity_close(day,venue)<=now
 
+def completed_utc_boundary(requested_day,now=None):
+    # Madrid can already be on the next date at the scheduled summer run.
+    # BTC/holder UTC days must still exclude the unfinished current UTC day.
+    return min(requested_day,(now or datetime.now(timezone.utc)).astimezone(timezone.utc).date().isoformat())
+
 def holders(today):
+    today=completed_utc_boundary(today)
     keys=['dates','lth','cumulative','coinmetrics']
     with ThreadPoolExecutor(max_workers=4) as pool:values=list(pool.map(lambda k:fetch(URLS[k],k!='obm'),keys))
     dates,lth_data,cum,cm=values;bulk=[dates,lth_data]
@@ -124,6 +130,7 @@ def news(today):
     return items[0].get('publishedAt') if items else today
 
 def btc_daily(today):
+    today=completed_utc_boundary(today)
     old=read('btc-candles.json');by={r['date']:r for r in old['rows']}
     start=datetime.fromisoformat(max(by)).replace(tzinfo=timezone.utc)-timedelta(days=2);end=datetime.fromisoformat(today).replace(tzinfo=timezone.utc)
     u='https://api.exchange.coinbase.com/products/BTC-USD/candles?'+urlencode({'start':start.isoformat(),'end':end.isoformat(),'granularity':86400})
@@ -194,7 +201,7 @@ def assemble(today,feeds):
 def main():
     ap=argparse.ArgumentParser();ap.add_argument('--as-of',default=datetime.now(ZoneInfo('Europe/Madrid')).date().isoformat());ap.add_argument('--offline',action='store_true');a=ap.parse_args();today=a.as_of;feeds=[]
     if not a.offline:
-        try:feeds.extend(issuer.run(today,read,save,ROOT))
+        try:feeds.extend(issuer.run(completed_utc_boundary(today),read,save,ROOT))
         except Exception as exc:feeds.append(dict(name='Issuer ingestion',state='error',checkedAt=datetime.now(timezone.utc).isoformat(),observationDate=None,error=type(exc).__name__+': issuer ingestion unavailable; inspect workflow logs and configuration'))
     for name,fn,filename in [('Holders',holders,'holders.json'),('MSTR and paired BTC',market,'mstr.json'),('BTC venue daily highs',btc_daily,'btc-candles.json'),('SEC filings',news,'news.json')]:
         try:

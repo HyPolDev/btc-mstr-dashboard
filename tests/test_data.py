@@ -56,6 +56,10 @@ class DataTests(unittest.TestCase):
     def test_exchange_metadata_handles_current_half_day(self):
         start=int(datetime(2026,11,27,14,30,tzinfo=timezone.utc).timestamp());end=int(datetime(2026,11,27,18,0,tzinfo=timezone.utc).timestamp())
         self.assertTrue(refresh.completed_equity_day('2026-11-27','2026-11-27',datetime(2026,11,27,18,10,tzinfo=timezone.utc),{'start':start,'end':end}))
+    def test_summer_madrid_midnight_does_not_complete_current_bitcoin_day(self):
+        instant=datetime(2026,7,10,22,37,tzinfo=timezone.utc)
+        self.assertEqual(refresh.completed_utc_boundary('2026-07-11',instant),'2026-07-10')
+        self.assertEqual(refresh.completed_utc_boundary('2026-07-09',instant),'2026-07-09')
     def test_public_files_exclude_private_context(self):
         for p in (ROOT/'data').glob('*.json'):
             text=p.read_text(encoding='utf-8')
