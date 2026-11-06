@@ -110,6 +110,11 @@ def parse_capital(tracker, converts, maintenance, previous, checked_at):
     if abs(adso-expected)>1000: raise ValueError('Assumed diluted shares mismatch; possible unmodeled conversion')
     # First observations of a newly changed schema cannot silently claim precision.
     accounting.validate_capital_snapshot(cap)
+    # A CMS republish of identical economic facts is not a new disclosure of
+    # those facts. Preserve the first already-observed publication boundary.
+    economic_keys=set(cap)-{'readAt','publishedAt','sourceId'}
+    if previous and all(previous.get(key)==cap[key] for key in economic_keys):
+        cap['publishedAt']=previous['publishedAt']
     stable={k:v for k,v in cap.items() if k!='readAt'}
     cap['sourceId']='issuer-cms-'+hashlib.sha256(json.dumps(stable,sort_keys=True).encode()).hexdigest()[:16]
     provenance = dict(sourceId=cap['sourceId'],economicDate=economic,publishedAt=cap['publishedAt'],

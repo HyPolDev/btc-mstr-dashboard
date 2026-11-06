@@ -42,6 +42,13 @@ class IssuerTests(unittest.TestCase):
         self.assertEqual(v['conversions']['removedDebtClaimUSD'],sum(x['principal'] for x in chosen))
         self.assertEqual(v['conversions']['fdso'],c['basicShares']+c['options']+c['rsuPsu']+sum(x['conversionShares'] for x in chosen))
 
+    def test_republishing_identical_facts_does_not_erase_first_known_date(self):
+        previous,_=self.parse()
+        self.fixture['tracker']['publish_details']['time']='2026-11-06T12:00:00Z'
+        current,_=issuer.parse_capital(self.fixture['tracker'],self.fixture['converts'],self.maintenance,previous,'2026-11-06T22:40:00+00:00')
+        self.assertEqual(current['publishedAt'],previous['publishedAt'])
+        self.assertEqual(current['sourceId'],previous['sourceId'])
+
     def test_actual_conversion_reduces_remaining_claim_and_potential_shares(self):
         before,_=self.parse(); count=100000; retired=count*183.19
         self.fixture['tracker']['basic_shares_outstanding']+=count
